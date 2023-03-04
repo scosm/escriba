@@ -1,2 +1,2 @@
 # escriba
-Natural language parsing software, including general non-deterministic finite-state machine.
+Natural language parsing software, including a general non-deterministic finite-state machine.
