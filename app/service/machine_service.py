@@ -1,5 +1,6 @@
 import re
 from collections import deque
+from copy import deepcopy
 from typing import Dict, List
 from uuid import uuid4
 from app.model.machine import Machine
@@ -102,12 +103,18 @@ def next_situations(situation: Situation) -> List[Situation]:
             match_length = len(match.group(0))
             new_remainder = situation.input_remainder[match_length:] if match_length < len(situation.input_remainder) else ""
             new_state_name = transition.state2_name
+            new_history = deepcopy(situation.history)
+            if new_history:
+                new_history.append(situation.dict())
+            else:
+                new_history = [situation.dict()]
             new_situation_dict = {
                 "id": str(uuid4()),
                 "input_complete": situation.input_complete,
                 "input_remainder": new_remainder,
                 "state_name": new_state_name,
                 "machine": situation.machine,
+                "history": new_history,
             }
             new_situation = Situation(**new_situation_dict)
             situations.append(new_situation)
@@ -141,6 +148,10 @@ def run_machine(machine: Machine, start_situation: Situation) -> List[Situation]
     while len(situation_queue) > 0:
         situation = situation_queue.popleft()
         if situation_is_end(situation, machine):
+            if situation.history:
+                situation.history.append(situation)
+            else:
+                situation.history = [situation]
             end_situations.append(situation)
         else:
             new_situations = next_situations(situation)
