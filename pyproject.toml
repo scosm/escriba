@@ -2,13 +2,13 @@
 name = "escriba"
 version = "0.1.0"
 description = ""
-authors = ["Your Name <you@example.com>"]
+authors = ["Scobie Smith <spsmith@finitestate.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.10"
-pytest = "^7.2.1"
+python = "^3.11"
 pydantic = "^1.10.5"
+pytest = "^7.2.2"
 
 
 [build-system]

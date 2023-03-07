@@ -86,7 +86,7 @@ def next_situations(situation: Situation) -> List[Situation]:
     """
     # These are the transitions flowing out of the state given by the provided situation.
     # So, no need to filter transitions by transition.state1_name==situation.state_name.
-    transitions = _transitions_of_state(situation.machine, situation.state_name)
+    transitions = _transitions_of_state(situation.machine, situation.state.name)
     # situation: input, state (==state1)
     # transition: state1, pattern -> state2
     situations = []
@@ -96,24 +96,37 @@ def next_situations(situation: Situation) -> List[Situation]:
         if situation.input_remainder == "" and transition.pattern != "":
             continue
 
-        # Does the input match with the transition's pattern?
-        # TODO: Does this handle when pattern is empty? It should.
+        # Does the input match with the transition's pattern? Then take this transition.
+        # TODO: Does this handle when pattern is empty? It should. Seems to.
         match = re.match(transition.pattern, situation.input_remainder)
         if match:
             match_length = len(match.group(0))
-            new_remainder = situation.input_remainder[match_length:] if match_length < len(situation.input_remainder) else ""
-            new_state_name = transition.state2_name
+            new_remainder = situation.input_remainder[match_length:] if match_length < len(situation.input_remainder) else ""  # Deepcopy??
+            new_state = deepcopy(situation.machine.states[transition.state2_name]) # The situation needs its own instance copy of the state, since states may be revisited.
+
+            new_machine = deepcopy(situation.machine)
+
+            # Execute a transformation specified on the transition. transform(prev situation, next situation, transition) => data structure of your choice (but consistent), saved in state.
+            # prev situation: situation (function arg). next situation: new_situation (below).
+            # transform can use the states, or the given transition (the one actually taken), or the history of the situations, or anything, to produce a new/updated data structure.
+            # It can then save that new data structure in the new state, in the state collection.
+            # TODO: BUT the trail could revisit the state!! So, no, we cannot use the state dict as the collection of state "instances", i.e., state visits. Each situation has a state instance. ***
+
+            # if transition.transform:
+            #     transform = transition.transform
+
             new_history = deepcopy(situation.history)
             if new_history:
-                new_history.append(situation.dict())
+                new_history.append(situation)
             else:
-                new_history = [situation.dict()]
+                new_history = [situation]
+
             new_situation_dict = {
                 "id": str(uuid4()),
                 "input_complete": situation.input_complete,
                 "input_remainder": new_remainder,
-                "state_name": new_state_name,
-                "machine": situation.machine,
+                "state": new_state,
+                "machine": new_machine,
                 "history": new_history,
             }
             new_situation = Situation(**new_situation_dict)
@@ -123,7 +136,7 @@ def next_situations(situation: Situation) -> List[Situation]:
 
 
 def situation_is_end(situation: Situation, machine: Machine):
-    state = machine.states[situation.state_name]
+    state = machine.states[situation.state.name]
     no_more_input = situation.input_remainder == ""
     return state.end and no_more_input
 
@@ -147,12 +160,11 @@ def run_machine(machine: Machine, start_situation: Situation) -> List[Situation]
 
     while len(situation_queue) > 0:
         situation = situation_queue.popleft()
+
         if situation_is_end(situation, machine):
-            if situation.history:
-                situation.history.append(situation)
-            else:
-                situation.history = [situation]
+            situation.history.append(situation)
             end_situations.append(situation)
+
         else:
             new_situations = next_situations(situation)
             situation_queue.extend(new_situations)

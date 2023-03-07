@@ -216,21 +216,22 @@ def test_next_situations():
         "id": str(uuid4()),
         "input_complete": "foobar",
         "input_remainder": "foobar",
-        "state_name": "start",
+        "state": states["start"],
         "machine": machine,
+        "history": [],
     })
 
     # ACT / ASSERT.
     situations = next_situations(initial_situation)
     assert situations
     assert len(situations) == 1
-    assert situations[0].state_name == "f-state"
+    assert situations[0].state.name == "f-state"
 
     # ACT / ASSERT.
     more_situations = next_situations(situations[0])
     assert more_situations
     assert len(more_situations) == 1
-    assert more_situations[0].state_name == "oo-state"
+    assert more_situations[0].state.name == "oo-state"
 
 
 def test_next_situations_regex():
@@ -288,14 +289,14 @@ def test_next_situations_regex():
             "transform": None,
             "event": None
         }),
-        "f-state": State(**{
+        "^f-state": State(**{
             "name": "^f-state",
             "end": False,
             "data": None,
             "transform": None,
             "event": None
         }),
-        "oo-state": State(**{
+        "o+-state": State(**{
             "name": "o+-state",
             "end": False,
             "data": None,
@@ -309,7 +310,7 @@ def test_next_situations_regex():
             "transform": None,
             "event": None
         }),
-        "a-state": State(**{
+        "a+-state": State(**{
             "name": "a+-state",
             "end": False,
             "data": None,
@@ -337,21 +338,22 @@ def test_next_situations_regex():
         "id": str(uuid4()),
         "input_complete": "foobar",
         "input_remainder": "foobar",
-        "state_name": "start",
+        "state": states["start"],
         "machine": machine,
+        "history": [],
     })
 
     # ACT / ASSERT.
     situations = next_situations(initial_situation)
     assert situations
     assert len(situations) == 1
-    assert situations[0].state_name == "^f-state"
+    assert situations[0].state.name == "^f-state"
 
     # ACT / ASSERT.
     more_situations = next_situations(situations[0])
     assert more_situations
     assert len(more_situations) == 1
-    assert more_situations[0].state_name == "o+-state"
+    assert more_situations[0].state.name == "o+-state"
 
 
 def test_run_machine():
@@ -458,12 +460,21 @@ def test_run_machine():
         "id": str(uuid4()),
         "input_complete": "foobar",
         "input_remainder": "foobar",
-        "state_name": "start",
+        "state": states["start"],
         "machine": machine,
+        "history": [],
     })
 
     end_situations = run_machine(machine, start_situation)
 
     assert end_situations
     assert len(end_situations) == 1
+    final_situation = end_situations[0]
+    assert final_situation.state.name == "end"
+    assert len(final_situation.history) == 7
+    assert final_situation.history[1].state.name == "^f-state"
+    assert final_situation.history[2].state.name == "o+-state"
+    assert final_situation.history[4].state.name == "a+-state"
+    assert final_situation.history[5].state.name == "r-state"
+    assert final_situation.history[6].state.name == "end"
 
