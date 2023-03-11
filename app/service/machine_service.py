@@ -1,6 +1,7 @@
 import re
 from collections import deque
 from copy import deepcopy
+from functools import reduce
 from typing import Dict, List
 from uuid import uuid4
 from app.model.machine import Machine
@@ -11,7 +12,7 @@ from app.model.transition import Transition
 
 def _transitions_of_state(machine: Machine, state_name: str) -> Dict[str, Transition]:
     """
-    Gets the set of transitions of a given source state.
+    Gets the set of transitions out of a given source state.
 
     Args:
         machine (Machine): The machine from which to get the set of transitions.
@@ -68,9 +69,82 @@ def create_machine(transitions: List[Transition], states: Dict[str, State]) -> M
     # TODO: Validate the state names with the graph.
 
     machine = Machine(graph=graph, states=states)
+
+    if not validate_machine(machine):
+        raise Exception(f"Created machine is invalid.")
     
     return machine
 
+
+def validate_machine(machine: Machine) -> bool:
+    """
+    Checks that the given machine satisfies critical requirements,
+    such as 
+
+    Args:
+        machine (Machine): The supplied machine to validate.
+
+    Returns:
+        bool: True if the machine is valid, false otherwise.
+    """
+    # There can be one and only one start state.
+    start_count = reduce(lambda sum, state: sum + 1 if state.start else sum, machine.states.values(), 0)
+    if start_count != 1:
+        return False
+
+    # There must be at least one end state.
+    end_count = reduce(lambda sum, state: sum + 1 if state.end else sum, machine.states.values(), 0)
+    if end_count < 1:
+        return False
+
+    # There can be no transitions ending on a start state.
+    if not _validate_transitions_on_start_state(machine):
+        return False
+
+    # There can be no transitions leaving an end state.
+    if not _validate_transitions_on_end_state(machine):
+        return False
+
+    return True
+
+
+def _validate_transitions_on_start_state(machine: Machine) -> bool:
+    """
+    Checks that no transition ends on a start state.
+
+    Args:
+        machine (Machine): The machine to validate.
+
+    Returns:
+        bool: True if no transitions have a start state as its destination, false otherwise.
+    """
+    for state_name in machine.graph.keys():
+        transition_dict = _transitions_of_state(machine, state_name)
+        for transition in transition_dict.values():
+            destination_state = machine.states[transition.state2_name]
+            if destination_state.start:
+                return False
+    return True
+
+
+def _validate_transitions_on_end_state(machine: Machine) -> bool:
+    """
+    Checks that no transition exit from an end state.
+
+    Args:
+        machine (Machine): The machine to validate.
+
+    Returns:
+        bool: True if no transitions have an end state as its source, false otherwise.
+    """
+    for state_name in machine.graph.keys():
+        transition_dict = _transitions_of_state(machine, state_name)
+        for transition in transition_dict.values():
+            source_state = machine.states[transition.state1_name]
+            if source_state.end:
+                return False
+    return True
+    
 
 def next_situations(situation: Situation) -> List[Situation]:
     """
@@ -106,14 +180,14 @@ def next_situations(situation: Situation) -> List[Situation]:
 
             new_machine = deepcopy(situation.machine)
 
-            # Execute a transformation specified on the transition. transform(prev situation, next situation, transition) => data structure of your choice (but consistent), saved in state.
-            # prev situation: situation (function arg). next situation: new_situation (below).
+            # Execute a transformation specified on the transition. transform(previous situation, transition) -> data structure (Any) of your choice (but consistent), saved in next state.
+            # previous situation: situation (function arg).
             # transform can use the states, or the given transition (the one actually taken), or the history of the situations, or anything, to produce a new/updated data structure.
             # It can then save that new data structure in the new state, in the state collection.
             # TODO: BUT the trail could revisit the state!! So, no, we cannot use the state dict as the collection of state "instances", i.e., state visits. Each situation has a state instance. ***
 
-            # if transition.transform:
-            #     transform = transition.transform
+            if transition.transform:
+                new_state.data = transition.transform(situation, transition)
 
             new_history = deepcopy(situation.history)
             if new_history:
@@ -125,6 +199,7 @@ def next_situations(situation: Situation) -> List[Situation]:
                 "id": str(uuid4()),
                 "input_complete": situation.input_complete,
                 "input_remainder": new_remainder,
+                "matched": match.group(0),
                 "state": new_state,
                 "machine": new_machine,
                 "history": new_history,

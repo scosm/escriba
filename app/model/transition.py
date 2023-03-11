@@ -6,6 +6,5 @@ class Transition(BaseModel):
     pattern: str
     state1_name: str
     state2_name: str
-    data: Optional[Any]
-    transform: Optional[Callable]
+    transform: Optional[Callable]  # transform(Situation, Transition) -> Any (data, stored in next Situation's state)
     event: Optional[List[Callable]]
